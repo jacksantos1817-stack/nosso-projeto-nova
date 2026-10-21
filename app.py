@@ -3,6 +3,7 @@ import json
 import random
 from pathlib import Path
 import streamlit as st
+from openai import OpenAI
 
 ROOT = Path(__file__).parent
 MEMORY_FILE = ROOT / "memory.json"
