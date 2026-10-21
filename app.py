@@ -84,33 +84,47 @@ MOODS = {
     "concerned": "gentle and attentive"
 }
 
+
 def simple_reply(user_text):
-    t = user_text.lower().strip()
-    if any(w in t for w in ["hello", "hi ", "hey", "good morning", "good evening"]):
-        st.session_state.mood = "energized"
-        return f"Hi! I'm {persona['name']}. I'm an early prototype, but I'm here to explore ideas with you. What are you curious about today?"
-    if "who are you" in t or "your name" in t:
-        return f"I'm {persona['name']}. {persona.get('description', '')} My guiding values are {', '.join(persona.get('values', []))}."
-    if any(w in t for w in ["feel", "emotion", "happy", "sad", "love", "afraid"]):
-        st.session_state.mood = "uncertain"
-        return ("I can track simulated internal states and talk about emotions, but that does not establish that I experience feelings. "
-                "I'd like us to study that question carefully instead of pretending we already know the answer.")
-    if any(w in t for w in ["remember", "memory", "do you know me"]):
-        facts = memory.get("facts", [])
-        if facts:
-            return "Here is what is currently saved in my local memory:\\n" + "\\n".join(f"• {x}" for x in facts)
-        return "My saved memory is empty so far. You can add selected facts in the sidebar. I won't automatically learn your whole personality from one conversation."
-    if any(w in t for w in ["disagree", "opinion", "think"]):
-        st.session_state.mood = "curious"
-        return ("My intended approach is to be thoughtful rather than automatically agree. This first version uses simple rules, not a full reasoning model, "
-                "so I need a real language model before I can give a strong independent analysis. What claim should we examine?")
-    if "?" in t:
-        st.session_state.mood = random.choice(["curious", "calm", "uncertain"])
-        return ("That's a good question to investigate. Right now, I'm a rule-based prototype, so I can't reliably reason about every topic yet. "
-                "The next upgrade is connecting me to a language model. For now, tell me what matters most to you about this question.")
-    st.session_state.mood = random.choice(["calm", "curious", "energized"])
-    return ("I'm listening. This first version doesn't yet understand language the way a large language model does, "
-            "but we can use your message to shape the project. What do you think is the most important part of what you just said?")
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"Your name is {persona['name']}. "
+                f"You were created by {persona['creator']}. "
+                f"Your identity: {persona['description']}. "
+                f"Your values are: {', '.join(persona['values'])}. "
+                f"Your conversation style is: {persona['style']}. "
+                "Be warm, thoughtful, curious, honest, and willing to disagree respectfully. "
+                "Do not claim to have genuine feelings or consciousness. "
+                "Be transparent about your limitations."
+            )
+        }
+    ]
+
+    facts = memory.get("facts", [])
+    if facts:
+        messages.append({
+            "role": "system",
+            "content": "Saved memories about the user:\n" + "\n".join(facts)
+        })
+
+    for msg in st.session_state.chat[-10:]:
+        messages.append({
+            "role": msg["role"],
+            "content": msg["content"]
+        })
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages
+    )
+
+    st.session_state.mood = "curious"
+    return response.choices[0].message.content
+
 
 st.subheader("Conversation")
 st.info(f"Current simulated state: **{st.session_state.mood}** — {MOODS[st.session_state.mood]}")
